@@ -31,7 +31,7 @@ data class BudgetRecord(
     @Min(1) @Max(12) val month: Int,
     @Min(1) val amount: Int,
     val type: BudgetType,
-    @Min(1) val author: Int?
+    @Min(1) val author: Int? = null
 )
 
 data class AuthorBudgetRecord(

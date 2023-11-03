@@ -8,6 +8,7 @@ import mobi.sevenwinds.app.author.AuthorResponse
 import mobi.sevenwinds.app.author.AuthorService
 import mobi.sevenwinds.app.author.AuthorTable
 import mobi.sevenwinds.utils.TimeUtils
+import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.andWhere
 import org.jetbrains.exposed.sql.leftJoin
 import org.jetbrains.exposed.sql.select
@@ -49,16 +50,18 @@ object BudgetService {
             val query = BudgetTable.leftJoin(AuthorTable, { author }, {AuthorTable.id})
                 .select { BudgetTable.year eq param.year }
                 .let { if (param.name?.isNotBlank() == true) it.andWhere { AuthorTable.name.regexp( param.name) } else it }
-                .limit(param.limit, param.offset)
 
             val total = query.count()
-            val data = query.map { AuthorBudgetRecord(it[BudgetTable.year], it[BudgetTable.month],
+            val sumByType = BudgetEntity.wrapRows(query).map { it.toResponse() }.groupBy { it.type.name }.mapValues { it.value.sumOf { v -> v.amount } }
+
+            val data = query.limit(param.limit, param.offset)
+                .orderBy(BudgetTable.month, SortOrder.ASC)
+                .orderBy(BudgetTable.amount, SortOrder.DESC)
+                .map { AuthorBudgetRecord(it[BudgetTable.year], it[BudgetTable.month],
                                     it[BudgetTable.amount], it[BudgetTable.type],
                 if(it[AuthorTable.name] == null) null
                 else AuthorEntity.wrapRow(it).toResponse()
             ) }
-
-            val sumByType = data.groupBy { it.type.name }.mapValues { it.value.sumOf { v -> v.amount } }
 
             return@transaction BudgetYearStatsResponse(
                 total = total,
